@@ -72,7 +72,7 @@ typedef float EmacsCGFloat;
    Hint: keep the trailing whitespace -- the version control system
    will reject accidental commits. */
 
-/* #define NSTRACE_ENABLED 1          */
+   #define NSTRACE_ENABLED 1
 
 
 /* When non-zero, trace output is enabled for all parts, except those

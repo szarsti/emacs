@@ -1036,8 +1036,11 @@ ns_update_begin (struct frame *f)
 #endif
 
   ns_updating_frame = f;
-  [view lockFocus];
 
+  // TOM changed
+  //[view lockFocus];
+  [view lockFocusIfCanDraw];
+ 
   /* drawRect may have been called for say the minibuffer, and then clip path
      is for the minibuffer.  But the display engine may draw more because
      we have set the frame as garbaged.  So reset clip path to the whole
@@ -1055,7 +1058,7 @@ ns_update_begin (struct frame *f)
         + FRAME_TOOLBAR_HEIGHT (f) <= cr.size.height)
       {
         bp = [[NSBezierPath bezierPathWithRect: r] retain];
-        [bp setClip];
+        //[bp setClip];
         [bp release];
       }
   }
@@ -1200,10 +1203,10 @@ ns_focus (struct frame *f, NSRect *r, int n)
   if (r)
     {
       [[NSGraphicsContext currentContext] saveGraphicsState];
-      if (n == 2)
-        NSRectClipList (r, 2);
-      else
-        NSRectClip (*r);
+      //if (n == 2)
+      //  NSRectClipList (r, 2);
+      //else
+      //  NSRectClip (*r);
       gsaved = YES;
     }
 }
@@ -2216,7 +2219,13 @@ x_set_frame_alpha (struct frame *f)
 #ifdef NS_IMPL_COCOA
   {
     EmacsView *view = FRAME_NS_VIEW (f);
-  [[view window] setAlphaValue: alpha];
+    //  NSWindow *window = [view window];
+  /* TOM: what would happen if we changed alpha only on contentView? */
+  /* TOM: probably this is also good place to play with background blur filter */
+  // TODO: does not work, people suggets just changing background color alpha channel
+    NSTRACE ("x_set_frame_alpha 0.5");
+    [view setBackgroundColor: [NSColor colorWithCalibratedWhite:0.25 alpha:0.25]];
+    [view setAlphaValue: 0.5];
   }
 #endif
 }
@@ -2480,7 +2489,7 @@ ns_clear_frame (struct frame *f)
   block_input ();
   ns_focus (f, &r, 1);
   [ns_lookup_indexed_color (NS_FACE_BACKGROUND (FRAME_DEFAULT_FACE (f)), f) set];
-  NSRectFill (r);
+  //NSRectFill (r);
   ns_unfocus (f);
 
   /* as of 2006/11 or so this is now needed */
@@ -6857,6 +6866,7 @@ not_in_argv (NSString *arg)
   [win useOptimizedDrawing: YES];
 #endif
 
+  [[win contentView] setWantsLayer: YES];
   [[win contentView] addSubview: self];
 
   if (ns_drag_types)
@@ -6915,9 +6925,43 @@ not_in_argv (NSString *arg)
 
   col = ns_lookup_indexed_color (NS_FACE_BACKGROUND
                                   (FRAME_DEFAULT_FACE (emacsframe)), emacsframe);
-  [win setBackgroundColor: col];
-  if ([col alphaComponent] != (EmacsCGFloat) 1.0)
-    [win setOpaque: NO];
+  /* TOM: We probably want to change that on contentView rather than whole thing */
+  //[[win contentView] setBackgroundColor: col];
+  /* TOM: while playing with background, you probably want to setOpaque to NO */
+  //if ([col alphaComponent] != (EmacsCGFloat) 1.0)
+  //  [win setOpaque: NO];
+  // Figgure out whether here or in filter we shoudl set colours
+  [win setBackgroundColor: [NSColor colorWithCalibratedWhite:1 alpha:0]];
+  [win setOpaque: NO];
+
+  NSView *view = self;
+
+  //[view lockFocusIfCanDraw];
+  // Sett up sublayer
+  CALayer *layer = [CALayer layer];
+  [view setLayer: layer];
+  [view setWantsLayer: YES];
+  //[view setLayerUsesCoreImageFilters: YES];
+  [[view layer] setBackgroundColor: [[NSColor colorWithRed:0.25 green:0.5 blue:0.75 alpha:0.5] CGColor]];
+  
+  // It's important to set the layer to mask to its bounds, otherwise the whole parent view 
+  /// might get blurred
+  [[view layer] setMasksToBounds:YES];
+  
+  // Set the layer to redraw itself once it's size is changed
+  [[view layer] setNeedsDisplayOnBoundsChange:YES];
+  
+  // Set up blur filer
+  CIFilter *blurFilter = [CIFilter filterWithName: @"CIGaussianBlur"];
+  [blurFilter setDefaults];
+  [blurFilter setValue: [NSNumber numberWithFloat: 20.0] forKey: @"inputRadius"];
+  //[sview layer].backgroundFilters = [NSArray arrayWithObject:blurFilter];
+  //[[view layer] setBackgroundFilters: @[blurFilter]];
+  [view setBackgroundFilters: @[blurFilter]];
+        
+
+  //Set alpha
+  //[sview setAlphaValue: 0.75];
 
 #if !defined (NS_IMPL_COCOA) || \
   MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_9
@@ -7358,7 +7402,8 @@ not_in_argv (NSString *arg)
   MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_9
       [fw useOptimizedDrawing: YES];
 #endif
-      [fw setBackgroundColor: col];
+      // TOM testing
+      //[fw contentView setBackgroundColor: col];
       if ([col alphaComponent] != (EmacsCGFloat) 1.0)
         [fw setOpaque: NO];
 
@@ -7394,7 +7439,8 @@ not_in_argv (NSString *arg)
         }
 
       [w setContentView:[fw contentView]];
-      [w setBackgroundColor: col];
+      // TOM testing
+      //[w setBackgroundColor: col];
       if ([col alphaComponent] != (EmacsCGFloat) 1.0)
         [w setOpaque: NO];
 
@@ -8000,6 +8046,8 @@ not_in_argv (NSString *arg)
           newWr.origin.y = sr.origin.y + margins.bottom;
           newWr.size.height = sr.size.height - margins.top - margins.bottom;
         }
+
+      ]
 
       if (fs_state == FULLSCREEN_MAXIMIZED
           || fs_state == FULLSCREEN_WIDTH)

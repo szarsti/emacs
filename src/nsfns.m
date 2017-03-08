@@ -280,6 +280,9 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   NSView *view = FRAME_NS_VIEW (f);
   EmacsCGFloat r, g, b, alpha;
 
+  // TOM added
+  NSTRACE ("x_set_background_color");
+
   block_input ();
   if (ns_lisp_to_color (arg, &col))
     {
@@ -303,13 +306,17 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 
   if (view != nil)
     {
-      [[view window] setBackgroundColor: col];
+      // TOM edited
+      //NSWindow *win = [view window];
+      //[[win contentView] setBackgroundColor: col];
 
-      if (alpha != (EmacsCGFloat) 1.0)
-          [[view window] setOpaque: NO];
-      else
-          [[view window] setOpaque: YES];
-
+      //if (alpha != (EmacsCGFloat) 1.0)
+      //  {
+      //    [[view window] setOpaque: NO];
+      //  }
+      //else
+      //    [[view window] setOpaque: YES];
+        
       face = FRAME_DEFAULT_FACE (f);
       if (face)
         {
